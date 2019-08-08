@@ -9,7 +9,7 @@ chrInfo="mm10_chrominfo.txt"
 ##directories
 fastq=Raw_fastq
 trim=Trimmed_fastq
-align=Alignment
+align=Alignments
 bigwigs=BigWigs
 
 
@@ -57,7 +57,7 @@ ILLUMINACLIP:proseq_adapters.fa:2:30:10 MINLEN:10 2> $trim/${i}_trimStats.txt
 echo $i trim done!
 done
 
-
+#done
 
 for f in $(ls $trim/*_paired_at.fastq.gz | cut -f2 -d "/" | cut -f1,2,3,4 -d '_' | uniq)
 do 
@@ -86,30 +86,24 @@ done
 
 
 
-if [ ! -d $bigwigs ]
-then
-
-	mkdir $bigwigs
-
-fi
-
 
 for i in ${align}/*.bam
 do
 
 	sample=$(basename $i .bam)
-	echo converting $sample to bed files	
-        bamToBed -i $i -bedpe -mate1 | awk 'BEGIN {OFS="\t"} ($5 > 20) {print $0}' > tmp.bed
+	echo converting $sample to bed files
+	##sort by read name first	
+        samtools sort -n $i | bamToBed -i stdin -bedpe -mate1 | awk 'BEGIN {OFS="\t"} ($5 > 20) {print $0}' > tmp.bed
 
 	echo splitting  $sample into 5prime and 3prime samples
 	### make bed files for 5' and '3
 	awk 'BEGIN{OFS="\t"} ($9 == "+") {print $1,$2,$2+1,$7,$8,$9}; ($9 == "-") {print $1,$3-1,$3,$7,$8,$9}' tmp.bed |\
-	awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6=="+"?"-":"+"}' | gzip  > ${sample}_3prime.bed.gz 
+	awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6=="+"?"-":"+"}' | sort -T $HOME -k1,1 - | gzip  > ${sample}_3prime.bed.gz 
        ## switching the strand of the read
 
 
 	awk 'BEGIN{OFS="\t"} ($9 == "+") {print $4,$6-1,$6,$7,$8,$9}; ($9 == "-") {print $4,$5,$5+1,$7,$8,$9}' tmp.bed |\
-        awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6=="+"?"-":"+"}' | gzip  > ${sample}_5prime.bed.gz 
+        awk 'BEGIN{OFS="\t"} {print $1,$2,$3,$4,$5,$6=="+"?"-":"+"}' | sort -T $HOME -k1,1 - | gzip  > ${sample}_5prime.bed.gz 
 	## switching the strand of the read
 
 	
@@ -149,5 +143,7 @@ do
 
 
 
- 
-echo Done!
+	rm tmp.bed ${sample}*bedGraph ${sample}*bed.gz 
+	echo Done!
+done
+
